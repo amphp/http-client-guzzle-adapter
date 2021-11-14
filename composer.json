@@ -22,13 +22,22 @@
         }
     ],
     "require": {
-        "php": ">=7.2",
-        "amphp/amp": "^2.3",
+        "php": ">=8.1",
+        "amphp/amp": "v3.x-dev",
+        "revolt/event-loop": "1.x-dev",
         "amphp/http": "^1.5",
-        "amphp/http-client": "^4",
-        "amphp/byte-stream": "^1.7",
+        "amphp/http-client": "v5.x-dev",
+        "amphp/byte-stream": "v2.x-dev",
+        "amphp/pipeline": "1.x-dev",
+        "amphp/socket": "v2.x-dev",
+        "amphp/dns": "v2.x-dev",
+        "amphp/sync": "v2.x-dev",
+        "amphp/cache": "v2.x-dev",
+        "amphp/windows-registry": "v1.x-dev",
+        "amphp/process": "v2.x-dev",
         "psr/http-message": "^1",
-        "psr/http-factory": "^1"
+        "psr/http-factory": "^1",
+        "psr/http-client": "^1.0"
     },
     "require-dev": {
         "amphp/phpunit-util": "^1.4",
@@ -36,8 +45,7 @@
         "phpunit/phpunit": "^8 || ^9",
         "friendsofphp/php-cs-fixer": "^2.3",
         "laminas/laminas-diactoros": "^2.3",
-        "guzzlehttp/guzzle": "7.0.0-beta.2",
-        "vimeo/psalm": "^3.11"
+        "guzzlehttp/guzzle": "^7.0"
     },
     "autoload": {
         "psr-4": {
