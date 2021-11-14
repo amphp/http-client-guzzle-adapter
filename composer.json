@@ -21,31 +21,25 @@
             "email": "zoohie@gmail.com"
         }
     ],
+    "minimum-stability": "dev",
+    "prefer-stable": true,
     "require": {
         "php": ">=8.1",
-        "amphp/amp": "v3.x-dev",
-        "revolt/event-loop": "1.x-dev",
-        "amphp/http": "^1.5",
-        "amphp/http-client": "v5.x-dev",
-        "amphp/byte-stream": "v2.x-dev",
-        "amphp/pipeline": "1.x-dev",
-        "amphp/socket": "v2.x-dev",
-        "amphp/dns": "v2.x-dev",
-        "amphp/sync": "v2.x-dev",
-        "amphp/cache": "v2.x-dev",
-        "amphp/windows-registry": "v1.x-dev",
-        "amphp/process": "v2.x-dev",
+        "amphp/amp": "^3",
+        "amphp/byte-stream": "^2",
+        "amphp/http-client": "^5",
         "psr/http-message": "^1",
         "psr/http-factory": "^1",
-        "psr/http-client": "^1.0"
+        "psr/http-client": "^1",
+        "revolt/event-loop": "^1"
     },
     "require-dev": {
         "amphp/phpunit-util": "^1.4",
         "amphp/php-cs-fixer-config": "dev-master",
-        "phpunit/phpunit": "^8 || ^9",
+        "phpunit/phpunit": "^9",
         "friendsofphp/php-cs-fixer": "^2.3",
         "laminas/laminas-diactoros": "^2.3",
-        "guzzlehttp/guzzle": "^7.0"
+        "guzzlehttp/guzzle": "^7"
     },
     "autoload": {
         "psr-4": {
