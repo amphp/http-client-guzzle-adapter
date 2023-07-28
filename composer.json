@@ -35,11 +35,11 @@
     },
     "require-dev": {
         "amphp/phpunit-util": "^1.4",
-        "amphp/php-cs-fixer-config": "dev-master",
+        "amphp/php-cs-fixer-config": "^2",
         "phpunit/phpunit": "^9",
-        "friendsofphp/php-cs-fixer": "^2.3",
         "laminas/laminas-diactoros": "^2.3",
-        "guzzlehttp/guzzle": "^7"
+        "guzzlehttp/guzzle": "^7",
+        "psalm/phar": "^5"
     },
     "autoload": {
         "psr-4": {

@@ -1,4 +1,4 @@
-<?php
+<?php declare(strict_types=1);
 
 use Amp\Http\Client\Psr7\PsrAdapter;
 use Amp\Http\Client\Request;
