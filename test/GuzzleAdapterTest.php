@@ -2,25 +2,12 @@
 
 namespace Amp\Http\Client\Psr7;
 
-use Amp\ByteStream\ReadableBuffer;
-use Amp\Http\Client\HttpContent;
-use Amp\Http\Client\HttpException;
-use Amp\Http\Client\Request;
-use Amp\Http\Client\RequestBody;
-use Amp\Http\Client\Response;
-use Amp\Http\HttpStatus;
 use Amp\PHPUnit\AsyncTestCase;
 use GuzzleHttp\Client;
 use GuzzleHttp\HandlerStack;
 use GuzzleHttp\Promise\PromiseInterface;
-use Laminas\Diactoros\Request as PsrRequest;
-use Laminas\Diactoros\RequestFactory;
-use Laminas\Diactoros\Response as PsrResponse;
-use Laminas\Diactoros\ResponseFactory;
-use PHPUnit\Framework\TestCase;
 
 use function Amp\async;
-use function Amp\ByteStream\buffer;
 use function Amp\delay;
 
 /**
@@ -39,9 +26,9 @@ class GuzzleAdapterTest extends AsyncTestCase
         $future = async($client->get(...), 'https://example.com/', ['delay' => 1000]);
         $this->assertFalse($future->isComplete());
         delay(1);
-        $t = microtime(true);
+        $t = \microtime(true);
         $this->assertNotEmpty((string) $future->await()->getBody());
-        $this->assertTrue(microtime(true)-$t < 1);
+        $this->assertTrue(\microtime(true)-$t < 1);
     }
     public function testRequestDelayGuzzleAsync(): void
     {
@@ -49,9 +36,9 @@ class GuzzleAdapterTest extends AsyncTestCase
         $promise = $client->getAsync('https://example.com/', ['delay' => 1000]);
         $this->assertEquals($promise->getState(), PromiseInterface::PENDING);
         delay(1);
-        $t = microtime(true);
+        $t = \microtime(true);
         $this->assertNotEmpty((string) $promise->wait()->getBody());
-        $this->assertTrue(microtime(true)-$t < 1);
+        $this->assertTrue(\microtime(true)-$t < 1);
     }
     public function testRequestCancel(): void
     {

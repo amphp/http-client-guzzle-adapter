@@ -1,4 +1,4 @@
-<?php
+<?php declare(strict_types=1);
 
 namespace Amp\Http\Client\Psr7;
 
@@ -6,12 +6,15 @@ use Amp\CancelledException;
 use Amp\DeferredCancellation;
 use Amp\Http\Client\HttpClient;
 use Amp\Http\Client\HttpClientBuilder;
-use GuzzleHttp\Promise\FulfilledPromise;
+use AssertionError;
 use GuzzleHttp\Promise\Promise;
 use GuzzleHttp\Promise\PromiseInterface;
-use Laminas\Diactoros\RequestFactory;
-use Laminas\Diactoros\ResponseFactory;
+use GuzzleHttp\Psr7\Request;
+use GuzzleHttp\Psr7\Response;
+use Psr\Http\Message\RequestFactoryInterface;
 use Psr\Http\Message\RequestInterface;
+use Psr\Http\Message\ResponseFactoryInterface;
+use Psr\Http\Message\ResponseInterface;
 use Throwable;
 
 use function Amp\async;
@@ -20,13 +23,27 @@ use function Amp\delay;
 /**
  * Handler for guzzle which uses amphp/http-client.
  */
-final class AmpHandler {
-    private readonly PsrAdapter $psrAdapter;
+final class AmpHandler
+{
+    private static ?PsrAdapter $psrAdapter;
     private readonly HttpClient $client;
     public function __construct(?HttpClient $client = null)
     {
+        if (!\interface_exists(PromiseInterface::class)) {
+            throw new AssertionError("Please require guzzle to use the guzzle AmpHandler!");
+        }
         $this->client = $client ?? HttpClientBuilder::buildDefault();
-        $this->psrAdapter = new PsrAdapter(new RequestFactory, new ResponseFactory);
+        self::$psrAdapter ??= new PsrAdapter(new class implements RequestFactoryInterface {
+            public function createRequest(string $method, $uri): RequestInterface
+            {
+                return new Request($method, $uri);
+            }
+        }, new class implements ResponseFactoryInterface {
+            public function createResponse(int $code = 200, string $reasonPhrase = ''): ResponseInterface
+            {
+                return new Response($code, reason: $reasonPhrase);
+            }
+        });
     }
 
     public function __invoke(RequestInterface $request, array $options): PromiseInterface
@@ -37,14 +54,14 @@ final class AmpHandler {
             if (isset($options['delay'])) {
                 delay($options['delay'] / 1000.0, cancellation: $cancellation);
             }
-            $request = $this->psrAdapter->fromPsrRequest($request);
+            $request = self::$psrAdapter->fromPsrRequest($request);
             if (isset($options['timeout'])) {
                 $request->setTransferTimeout((float) $options['timeout']);
             }
             if (isset($options['connect_timeout'])) {
                 $request->setTcpConnectTimeout((float) $options['connect_timeout']);
             }
-            return $this->psrAdapter->toPsrResponse(
+            return self::$psrAdapter->toPsrResponse(
                 $this->client->request(
                     $request,
                     $cancellation
