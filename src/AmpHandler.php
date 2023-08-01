@@ -37,9 +37,16 @@ final class AmpHandler {
             if (isset($options['delay'])) {
                 delay($options['delay'] / 1000.0, cancellation: $cancellation);
             }
+            $request = $this->psrAdapter->fromPsrRequest($request);
+            if (isset($options['timeout'])) {
+                $request->setTransferTimeout((float) $options['timeout']);
+            }
+            if (isset($options['connect_timeout'])) {
+                $request->setTcpConnectTimeout((float) $options['connect_timeout']);
+            }
             return $this->psrAdapter->toPsrResponse(
                 $this->client->request(
-                    $this->psrAdapter->fromPsrRequest($request),
+                    $request,
                     $cancellation
                 )
             );
