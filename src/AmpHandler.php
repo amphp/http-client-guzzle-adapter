@@ -54,6 +54,7 @@ final class AmpHandler
             if (isset($options['delay'])) {
                 delay($options['delay'] / 1000.0, cancellation: $cancellation);
             }
+            /** @psalm-suppress PossiblyNullReference Initialized in the constructor */
             $request = self::$psrAdapter->fromPsrRequest($request);
             if (isset($options['timeout'])) {
                 $request->setTransferTimeout((float) $options['timeout']);
