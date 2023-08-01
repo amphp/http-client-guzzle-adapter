@@ -1,18 +1,18 @@
 <?php declare(strict_types=1);
 
-use Amp\Http\Client\Psr7\PsrAdapter;
-use Amp\Http\Client\Request;
+use Amp\Http\Client\Psr7\AmpHandler;
 use GuzzleHttp\Client;
-use Laminas\Diactoros\RequestFactory;
-use Laminas\Diactoros\ResponseFactory;
+use GuzzleHttp\HandlerStack;
+
+use function Amp\async;
+use function Amp\ByteStream\getStdout;
 
 require __DIR__ . '/../vendor/autoload.php';
 
-$psrAdapter = new PsrAdapter(new RequestFactory, new ResponseFactory);
+$client = new Client(['handler' => HandlerStack::create(new AmpHandler)]);
 
-$request = new Request('https://api.github.com/');
+$future = async($client->get(...), 'https://api.github.com/', ['delay' => 1000]);
 
-$psrResponse = (new Client)->send($psrAdapter->toPsrRequest($request));
-$response = $psrAdapter->fromPsrResponse($psrResponse, $request);
+getStdout()->write("First output: ".$client->get('https://api.github.com/')->getBody().PHP_EOL);
 
-print $response->getBody()->buffer();
+getStdout()->write("Deferred output: ".$future->await()->getBody().PHP_EOL);

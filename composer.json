@@ -31,10 +31,10 @@
         "psr/http-message": "^1",
         "psr/http-factory": "^1",
         "psr/http-client": "^1",
-        "revolt/event-loop": "^0.2"
+        "revolt/event-loop": "^1"
     },
     "require-dev": {
-        "amphp/phpunit-util": "^1.4",
+        "amphp/phpunit-util": "^3",
         "amphp/php-cs-fixer-config": "^2",
         "phpunit/phpunit": "^9",
         "laminas/laminas-diactoros": "^2.3",
