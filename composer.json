@@ -31,7 +31,8 @@
         "psr/http-message": "^1",
         "psr/http-factory": "^1",
         "psr/http-client": "^1",
-        "revolt/event-loop": "^1"
+        "revolt/event-loop": "^1",
+        "amphp/http-tunnel": "^2.0@beta"
     },
     "require-dev": {
         "amphp/phpunit-util": "^3",
