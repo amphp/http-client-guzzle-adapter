@@ -5,6 +5,7 @@ namespace Amp\Http\Client\Psr7;
 use Amp\CancelledException;
 use Amp\DeferredCancellation;
 use Amp\Dns\DnsRecord;
+use Amp\File\File;
 use Amp\Http\Client\Connection\DefaultConnectionFactory;
 use Amp\Http\Client\Connection\UnlimitedConnectionPool;
 use Amp\Http\Client\HttpClient;
@@ -30,7 +31,9 @@ use Psr\Http\Message\ResponseInterface;
 use Throwable;
 
 use function Amp\async;
+use function Amp\ByteStream\pipe;
 use function Amp\delay;
+use function Amp\File\openFile;
 
 /**
  * Handler for guzzle which uses amphp/http-client.
@@ -158,12 +161,21 @@ final class AmpHandler
             if (isset($options['amp']['protocols'])) {
                 $request->setProtocolVersions($options['amp']['protocols']);
             }
-            return self::$psrAdapter->toPsrResponse(
-                $client->request(
-                    $request,
-                    $cancellation
-                )
+            $response = $client->request(
+                $request,
+                $cancellation
             );
+            if (isset($options[RequestOptions::SINK])) {
+                if (!\is_string($options[RequestOptions::SINK])) {
+                    throw new AssertionError("Only a file name can be provided as sink!");
+                }
+                if (!\interface_exists(File::class)) {
+                    throw new AssertionError("Please require amphp/file to use the sink option!");
+                }
+                $f = openFile($options[RequestOptions::SINK], 'w');
+                pipe($response->getBody(), $f, $cancellation);
+            }
+            return self::$psrAdapter->toPsrResponse($response);
         });
         $future->ignore();
         $promise = new Promise(function () use ($future, $cancellation, &$promise) {
