@@ -6,6 +6,9 @@ use Amp\PHPUnit\AsyncTestCase;
 use GuzzleHttp\Client;
 use GuzzleHttp\HandlerStack;
 use GuzzleHttp\Promise\PromiseInterface;
+use GuzzleHttp\RequestOptions;
+use LeProxy\LeProxy\LeProxyServer;
+use React\EventLoop\Loop;
 
 use function Amp\async;
 use function Amp\delay;
@@ -29,6 +32,21 @@ class GuzzleAdapterTest extends AsyncTestCase
         $t = \microtime(true);
         $this->assertNotEmpty((string) $future->await()->getBody());
         $this->assertTrue(\microtime(true)-$t < 1);
+    }
+    public function testRequestProxies(): void
+    {
+        $proxy = new LeProxyServer(Loop::get());
+        $socket = $proxy->listen('127.0.0.1:0', false);
+
+        $client = new Client(['handler' => HandlerStack::create(new AmpHandler)]);
+        foreach (['socks5://', 'http://'] as $scheme) {
+            $uri = \str_replace('tcp://', $scheme, $socket->getAddress());
+
+            $result = $client->get('https://example.com/', [RequestOptions::PROXY => [
+                'https' => $uri
+            ]]);
+            $this->assertStringContainsString('Example Domain', (string) $result->getBody());
+        }
     }
     public function testRequestDelayGuzzleAsync(): void
     {

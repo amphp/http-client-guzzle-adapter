@@ -10,6 +10,7 @@ use Amp\Http\Client\HttpClient;
 use Amp\Http\Client\HttpClientBuilder;
 use Amp\Http\Tunnel\Http1TunnelConnector;
 use Amp\Http\Tunnel\Https1TunnelConnector;
+use Amp\Http\Tunnel\Socks5TunnelConnector;
 use Amp\Socket\Certificate;
 use Amp\Socket\ClientTlsContext;
 use Amp\Socket\ConnectContext;
@@ -85,8 +86,9 @@ final class AmpHandler
                     isset($options[RequestOptions::VERIFY])
                     && $options[RequestOptions::VERIFY] !== true
                 )) {
-                $tlsContext = new ClientTlsContext();
+                $tlsContext = null;
                 if (isset($options[RequestOptions::CERT])) {
+                    $tlsContext ??= new ClientTlsContext();
                     if (\is_string($options[RequestOptions::CERT])) {
                         $tlsContext = $tlsContext->withCertificate(new Certificate(
                             $options[RequestOptions::CERT],
@@ -101,9 +103,10 @@ final class AmpHandler
                     }
                 }
                 if (isset($options[RequestOptions::VERIFY])) {
+                    $tlsContext ??= new ClientTlsContext();
                     if ($options[RequestOptions::VERIFY] === false) {
                         $tlsContext = $tlsContext->withoutPeerVerification();
-                    } else {
+                    } elseif (\is_string($options[RequestOptions::VERIFY])) {
                         $tlsContext = $tlsContext->withCaFile($options[RequestOptions::VERIFY]);
                     }
                 }
@@ -126,13 +129,16 @@ final class AmpHandler
                         $connector = new Uri($connector);
                         $connector = match ($connector->getScheme()) {
                             'http' => new Http1TunnelConnector($connector->getHost().':'.$connector->getPort()),
-                            'https' => new Https1TunnelConnector($connector->getHost().':'.$connector->getPort(), new ClientTlsContext()),
+                            'https' => new Https1TunnelConnector($connector->getHost().':'.$connector->getPort(), new ClientTlsContext($connector->getHost())),
+                            'socks5' => new Socks5TunnelConnector($connector->getHost().':'.$connector->getPort())
                         };
                     }
                 }
 
-                $connectContext = (new ConnectContext)
-                    ->withTlsContext($tlsContext);
+                $connectContext = new ConnectContext;
+                if ($tlsContext) {
+                    $connectContext = $connectContext->withTlsContext($tlsContext);
+                }
 
                 $client = (new HttpClientBuilder)
                     ->usingPool(new UnlimitedConnectionPool(new DefaultConnectionFactory(connector: $connector, connectContext: $connectContext)))

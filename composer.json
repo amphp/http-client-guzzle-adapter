@@ -40,7 +40,9 @@
         "phpunit/phpunit": "^9",
         "laminas/laminas-diactoros": "^2.3",
         "guzzlehttp/guzzle": "^7",
-        "psalm/phar": "^5"
+        "psalm/phar": "^5",
+        "leproxy/leproxy": "^0.2.2",
+        "revolt/event-loop-adapter-react": "^1"
     },
     "autoload": {
         "psr-4": {
