@@ -4,6 +4,7 @@ namespace Amp\Http\Client\Psr7;
 
 use Amp\CancelledException;
 use Amp\DeferredCancellation;
+use Amp\Dns\DnsRecord;
 use Amp\Http\Client\Connection\DefaultConnectionFactory;
 use Amp\Http\Client\Connection\UnlimitedConnectionPool;
 use Amp\Http\Client\HttpClient;
@@ -78,15 +79,15 @@ final class AmpHandler
             if (isset($options[RequestOptions::CONNECT_TIMEOUT])) {
                 $request->setTcpConnectTimeout((float) $options[RequestOptions::CONNECT_TIMEOUT]);
             }
-            if (isset($options[RequestOptions::PROXY])) {
-            }
 
             $client = $this->client;
             if (isset($options[RequestOptions::CERT]) ||
                 isset($options[RequestOptions::PROXY]) || (
                     isset($options[RequestOptions::VERIFY])
                     && $options[RequestOptions::VERIFY] !== true
-                )) {
+                ) ||
+                isset($options[RequestOptions::FORCE_IP_RESOLVE])
+            ) {
                 $tlsContext = null;
                 if (isset($options[RequestOptions::CERT])) {
                     $tlsContext ??= new ClientTlsContext();
@@ -139,6 +140,12 @@ final class AmpHandler
                 $connectContext = new ConnectContext;
                 if ($tlsContext) {
                     $connectContext = $connectContext->withTlsContext($tlsContext);
+                }
+                if (isset($options[RequestOptions::FORCE_IP_RESOLVE])) {
+                    $connectContext->withDnsTypeRestriction(match ($options[RequestOptions::FORCE_IP_RESOLVE]) {
+                        'v4' => DnsRecord::A,
+                        'v6' => DnsRecord::AAAA,
+                    });
                 }
 
                 $client = (new HttpClientBuilder)
