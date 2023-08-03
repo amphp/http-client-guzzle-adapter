@@ -73,6 +73,7 @@ final class AmpHandler
             $request = self::$psrAdapter->fromPsrRequest($request);
             if (isset($options[RequestOptions::TIMEOUT])) {
                 $request->setTransferTimeout((float) $options[RequestOptions::TIMEOUT]);
+                $request->setInactivityTimeout((float) $options[RequestOptions::TIMEOUT]);
             }
             if (isset($options[RequestOptions::CONNECT_TIMEOUT])) {
                 $request->setTcpConnectTimeout((float) $options[RequestOptions::CONNECT_TIMEOUT]);
