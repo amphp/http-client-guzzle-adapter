@@ -70,7 +70,7 @@ final class AmpHandler
     public function __invoke(RequestInterface $request, array $options): PromiseInterface
     {
         if (isset($options['curl'])) {
-            throw new AssertionError("Cannot provide curl options when using AMP backend!");
+            //throw new AssertionError("Cannot provide curl options when using AMP backend!");
         }
         $deferred = new DeferredCancellation;
         $cancellation = $deferred->getCancellation();
