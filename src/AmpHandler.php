@@ -42,6 +42,8 @@ final class AmpHandler
 {
     private static ?PsrAdapter $psrAdapter;
     private readonly HttpClient $client;
+    /** @var array<string, HttpClient> */
+    private array $cachedClients = [];
     public function __construct(?HttpClient $client = null)
     {
         if (!\interface_exists(PromiseInterface::class)) {
@@ -94,69 +96,80 @@ final class AmpHandler
                 ) ||
                 isset($options[RequestOptions::FORCE_IP_RESOLVE])
             ) {
-                $tlsContext = null;
-                if (isset($options[RequestOptions::CERT])) {
-                    $tlsContext ??= new ClientTlsContext();
-                    if (\is_string($options[RequestOptions::CERT])) {
-                        $tlsContext = $tlsContext->withCertificate(new Certificate(
-                            $options[RequestOptions::CERT],
-                            $options[RequestOptions::SSL_KEY] ?? null,
-                        ));
-                    } else {
-                        $tlsContext = $tlsContext->withCertificate(new Certificate(
-                            $options[RequestOptions::CERT][0],
-                            $options[RequestOptions::SSL_KEY] ?? null,
-                            $options[RequestOptions::CERT][1]
-                        ));
-                    }
+                $cacheKey = [];
+                foreach ([RequestOptions::FORCE_IP_RESOLVE, RequestOptions::VERIFY, RequestOptions::PROXY, RequestOptions::CERT] as $k) {
+                    $cacheKey[$k] = $options[$k] ?? null;
                 }
-                if (isset($options[RequestOptions::VERIFY])) {
-                    $tlsContext ??= new ClientTlsContext();
-                    if ($options[RequestOptions::VERIFY] === false) {
-                        $tlsContext = $tlsContext->withoutPeerVerification();
-                    } elseif (\is_string($options[RequestOptions::VERIFY])) {
-                        $tlsContext = $tlsContext->withCaFile($options[RequestOptions::VERIFY]);
+                $cacheKey = json_encode($cacheKey);
+                if (isset($this->cachedClients[$cacheKey])) {
+                    $client = $this->cachedClients[$cacheKey];
+                } else {
+                    $tlsContext = null;
+                    if (isset($options[RequestOptions::CERT])) {
+                        $tlsContext ??= new ClientTlsContext();
+                        if (\is_string($options[RequestOptions::CERT])) {
+                            $tlsContext = $tlsContext->withCertificate(new Certificate(
+                                $options[RequestOptions::CERT],
+                                $options[RequestOptions::SSL_KEY] ?? null,
+                            ));
+                        } else {
+                            $tlsContext = $tlsContext->withCertificate(new Certificate(
+                                $options[RequestOptions::CERT][0],
+                                $options[RequestOptions::SSL_KEY] ?? null,
+                                $options[RequestOptions::CERT][1]
+                            ));
+                        }
                     }
-                }
-
-                $connector = null;
-                if (isset($options[RequestOptions::PROXY])) {
-                    if (!\is_array($options['proxy'])) {
-                        $connector = $options['proxy'];
-                    } else {
-                        $scheme = $request->getUri()->getScheme();
-                        if (isset($options['proxy'][$scheme])) {
-                            $host = $request->getUri()->getHost();
-                            if (!isset($options['proxy']['no']) || !Utils::isHostInNoProxy($host, $options['proxy']['no'])) {
-                                $connector = $options['proxy'][$scheme];
-                            }
+                    if (isset($options[RequestOptions::VERIFY])) {
+                        $tlsContext ??= new ClientTlsContext();
+                        if ($options[RequestOptions::VERIFY] === false) {
+                            $tlsContext = $tlsContext->withoutPeerVerification();
+                        } elseif (\is_string($options[RequestOptions::VERIFY])) {
+                            $tlsContext = $tlsContext->withCaFile($options[RequestOptions::VERIFY]);
                         }
                     }
 
-                    if ($connector !== null) {
-                        $connector = new Uri($connector);
-                        $connector = match ($connector->getScheme()) {
-                            'http' => new Http1TunnelConnector($connector->getHost().':'.$connector->getPort()),
-                            'https' => new Https1TunnelConnector($connector->getHost().':'.$connector->getPort(), new ClientTlsContext($connector->getHost())),
-                            'socks5' => new Socks5TunnelConnector($connector->getHost().':'.$connector->getPort())
-                        };
+                    $connector = null;
+                    if (isset($options[RequestOptions::PROXY])) {
+                        if (!\is_array($options['proxy'])) {
+                            $connector = $options['proxy'];
+                        } else {
+                            $scheme = $request->getUri()->getScheme();
+                            if (isset($options['proxy'][$scheme])) {
+                                $host = $request->getUri()->getHost();
+                                if (!isset($options['proxy']['no']) || !Utils::isHostInNoProxy($host, $options['proxy']['no'])) {
+                                    $connector = $options['proxy'][$scheme];
+                                }
+                            }
+                        }
+
+                        if ($connector !== null) {
+                            $connector = new Uri($connector);
+                            $connector = match ($connector->getScheme()) {
+                                'http' => new Http1TunnelConnector($connector->getHost().':'.$connector->getPort()),
+                                'https' => new Https1TunnelConnector($connector->getHost().':'.$connector->getPort(), new ClientTlsContext($connector->getHost())),
+                                'socks5' => new Socks5TunnelConnector($connector->getHost().':'.$connector->getPort())
+                            };
+                        }
                     }
-                }
 
-                $connectContext = new ConnectContext;
-                if ($tlsContext) {
-                    $connectContext = $connectContext->withTlsContext($tlsContext);
-                }
-                if (isset($options[RequestOptions::FORCE_IP_RESOLVE])) {
-                    $connectContext->withDnsTypeRestriction(match ($options[RequestOptions::FORCE_IP_RESOLVE]) {
-                        'v4' => DnsRecord::A,
-                        'v6' => DnsRecord::AAAA,
-                    });
-                }
+                    $connectContext = new ConnectContext;
+                    if ($tlsContext) {
+                        $connectContext = $connectContext->withTlsContext($tlsContext);
+                    }
+                    if (isset($options[RequestOptions::FORCE_IP_RESOLVE])) {
+                        $connectContext->withDnsTypeRestriction(match ($options[RequestOptions::FORCE_IP_RESOLVE]) {
+                            'v4' => DnsRecord::A,
+                            'v6' => DnsRecord::AAAA,
+                        });
+                    }
 
-                $client = (new HttpClientBuilder)
-                    ->usingPool(new UnlimitedConnectionPool(new DefaultConnectionFactory(connector: $connector, connectContext: $connectContext)))
-                    ->build();
+                    $client = (new HttpClientBuilder)
+                        ->usingPool(new UnlimitedConnectionPool(new DefaultConnectionFactory(connector: $connector, connectContext: $connectContext)))
+                        ->build();
+
+                    $this->cachedClients[$cacheKey] = $client;
+                }
             }
             if (isset($options['amp']['protocols'])) {
                 $request->setProtocolVersions($options['amp']['protocols']);
