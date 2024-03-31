@@ -31,15 +31,19 @@
         "psr/http-message": "^1",
         "psr/http-factory": "^1",
         "psr/http-client": "^1",
-        "revolt/event-loop": "^0.2"
+        "revolt/event-loop": "^1",
+        "amphp/http-tunnel": "^2.0@beta"
     },
     "require-dev": {
-        "amphp/phpunit-util": "^1.4",
-        "amphp/php-cs-fixer-config": "dev-master",
+        "amphp/phpunit-util": "^3",
+        "amphp/php-cs-fixer-config": "^2",
         "phpunit/phpunit": "^9",
-        "friendsofphp/php-cs-fixer": "^2.3",
         "laminas/laminas-diactoros": "^2.3",
-        "guzzlehttp/guzzle": "^7"
+        "guzzlehttp/guzzle": "^7",
+        "psalm/phar": "^5",
+        "leproxy/leproxy": "^0.2.2",
+        "revolt/event-loop-adapter-react": "^1",
+        "amphp/file": "^3.0"
     },
     "autoload": {
         "psr-4": {
