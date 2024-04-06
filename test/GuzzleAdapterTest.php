@@ -9,23 +9,23 @@ use GuzzleHttp\Promise\PromiseInterface;
 use GuzzleHttp\RequestOptions;
 use LeProxy\LeProxy\LeProxyServer;
 use React\EventLoop\Loop;
-
 use function Amp\async;
 use function Amp\delay;
 
 /**
- * @covers \Amp\Http\Client\Psr7\AmpHandler
+ * @covers \Amp\Http\Client\Psr7\GuzzleHandlerAdapter
  */
 class GuzzleAdapterTest extends AsyncTestCase
 {
     public function testRequest(): void
     {
-        $client = new Client(['handler' => HandlerStack::create(new AmpHandler)]);
+        $client = new Client(['handler' => HandlerStack::create(new GuzzleHandlerAdapter())]);
         $this->assertNotEmpty((string) $client->get('https://example.com/')->getBody());
     }
+
     public function testRequestDelay(): void
     {
-        $client = new Client(['handler' => HandlerStack::create(new AmpHandler)]);
+        $client = new Client(['handler' => HandlerStack::create(new GuzzleHandlerAdapter())]);
         $future = async($client->get(...), 'https://example.com/', ['delay' => 1000]);
         $this->assertFalse($future->isComplete());
         delay(1);
@@ -33,12 +33,13 @@ class GuzzleAdapterTest extends AsyncTestCase
         $this->assertNotEmpty((string) $future->await()->getBody());
         $this->assertTrue(\microtime(true)-$t < 1);
     }
+
     public function testRequestProxies(): void
     {
         $proxy = new LeProxyServer(Loop::get());
         $socket = $proxy->listen('127.0.0.1:0', false);
 
-        $client = new Client(['handler' => HandlerStack::create(new AmpHandler)]);
+        $client = new Client(['handler' => HandlerStack::create(new GuzzleHandlerAdapter())]);
         foreach (['socks5://', 'http://'] as $scheme) {
             $uri = \str_replace('tcp://', $scheme, $socket->getAddress());
 
@@ -48,9 +49,10 @@ class GuzzleAdapterTest extends AsyncTestCase
             $this->assertStringContainsString('Example Domain', (string) $result->getBody());
         }
     }
+
     public function testRequestDelayGuzzleAsync(): void
     {
-        $client = new Client(['handler' => HandlerStack::create(new AmpHandler)]);
+        $client = new Client(['handler' => HandlerStack::create(new GuzzleHandlerAdapter())]);
         $promise = $client->getAsync('https://example.com/', ['delay' => 1000]);
         $this->assertEquals($promise->getState(), PromiseInterface::PENDING);
         delay(1);
@@ -58,17 +60,19 @@ class GuzzleAdapterTest extends AsyncTestCase
         $this->assertNotEmpty((string) $promise->wait()->getBody());
         $this->assertTrue(\microtime(true)-$t < 1);
     }
+
     public function testRequestCancel(): void
     {
-        $client = new Client(['handler' => HandlerStack::create(new AmpHandler)]);
+        $client = new Client(['handler' => HandlerStack::create(new GuzzleHandlerAdapter())]);
         $promise = $client->getAsync('https://example.com/', ['delay' => 2000]);
         $promise->cancel();
         $this->assertEquals($promise->getState(), PromiseInterface::REJECTED);
     }
+
     public function testRequest404(): void
     {
         $this->expectExceptionMessageMatches('/404 Not Found/');
-        $client = new Client(['handler' => HandlerStack::create(new AmpHandler)]);
+        $client = new Client(['handler' => HandlerStack::create(new GuzzleHandlerAdapter())]);
         $client->get('https://example.com/test');
     }
 }

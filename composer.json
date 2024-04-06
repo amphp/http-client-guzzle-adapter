@@ -28,11 +28,11 @@
         "amphp/amp": "^3",
         "amphp/byte-stream": "^2",
         "amphp/http-client": "^5",
+        "amphp/http-tunnel": "^2",
         "psr/http-message": "^1",
         "psr/http-factory": "^1",
         "psr/http-client": "^1",
-        "revolt/event-loop": "^1",
-        "amphp/http-tunnel": "^2.0@beta"
+        "revolt/event-loop": "^1"
     },
     "require-dev": {
         "amphp/phpunit-util": "^3",
