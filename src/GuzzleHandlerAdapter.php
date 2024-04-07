@@ -17,6 +17,7 @@ use Amp\Http\Tunnel\Socks5TunnelConnector;
 use Amp\Socket\Certificate;
 use Amp\Socket\ClientTlsContext;
 use Amp\Socket\ConnectContext;
+use Amp\Socket\SocketConnector;
 use AssertionError;
 use GuzzleHttp\Promise\Promise;
 use GuzzleHttp\Promise\PromiseInterface;
@@ -46,21 +47,6 @@ final class GuzzleHandlerAdapter
     /** @var array<string, HttpClient> */
     private array $cachedClients = [];
 
-    private static function getPsrAdapter(): PsrAdapter
-    {
-        return self::$psrAdapter ??= new PsrAdapter(new class implements PsrRequestFactory {
-            public function createRequest(string $method, $uri): GuzzleRequest
-            {
-                return new GuzzleRequest($method, $uri);
-            }
-        }, new class implements PsrResponseFactory {
-            public function createResponse(int $code = 200, string $reasonPhrase = ''): GuzzleResponse
-            {
-                return new GuzzleResponse($code, reason: $reasonPhrase);
-            }
-        });
-    }
-
     public function __construct(?HttpClient $client = null)
     {
         if (!\interface_exists(PromiseInterface::class)) {
@@ -76,8 +62,8 @@ final class GuzzleHandlerAdapter
             throw new AssertionError("Cannot provide curl options when using AMP backend!");
         }
 
-        $deferred = new DeferredCancellation();
-        $cancellation = $deferred->getCancellation();
+        $deferredCancellation = new DeferredCancellation();
+        $cancellation = $deferredCancellation->getCancellation();
         $future = async(function () use ($request, $options, $cancellation): PsrResponse {
             if (isset($options['delay'])) {
                 delay($options['delay'] / 1000.0, cancellation: $cancellation);
@@ -127,7 +113,7 @@ final class GuzzleHandlerAdapter
             } catch (\Throwable $e) {
                 $promise->reject($e);
             }
-        }, $deferred->cancel(...));
+        }, $deferredCancellation->cancel(...));
 
         return $promise;
     }
@@ -157,64 +143,7 @@ final class GuzzleHandlerAdapter
                 return $this->cachedClients[$cacheKey];
             }
 
-            $tlsContext = null;
-            if (isset($options[RequestOptions::CERT])) {
-                $tlsContext = new ClientTlsContext();
-                if (\is_string($options[RequestOptions::CERT])) {
-                    $tlsContext = $tlsContext->withCertificate(new Certificate(
-                        $options[RequestOptions::CERT],
-                        $options[RequestOptions::SSL_KEY] ?? null,
-                    ));
-                } else {
-                    $tlsContext = $tlsContext->withCertificate(new Certificate(
-                        $options[RequestOptions::CERT][0],
-                        $options[RequestOptions::SSL_KEY] ?? null,
-                        $options[RequestOptions::CERT][1],
-                    ));
-                }
-            }
-            if (isset($options[RequestOptions::VERIFY])) {
-                $tlsContext ??= new ClientTlsContext();
-                if ($options[RequestOptions::VERIFY] === false) {
-                    $tlsContext = $tlsContext->withoutPeerVerification();
-                } elseif (\is_string($options[RequestOptions::VERIFY])) {
-                    $tlsContext = $tlsContext->withCaFile($options[RequestOptions::VERIFY]);
-                }
-            }
-
-            $connector = null;
-            if (isset($options[RequestOptions::PROXY])) {
-                if (!\is_array($options['proxy'])) {
-                    $connector = $options['proxy'];
-                } else {
-                    $scheme = $request->getUri()->getScheme();
-                    if (isset($options['proxy'][$scheme])) {
-                        $host = $request->getUri()->getHost();
-                        if (!isset($options['proxy']['no'])
-                            || !Utils::isHostInNoProxy($host, $options['proxy']['no'])
-                        ) {
-                            $connector = $options['proxy'][$scheme];
-                        }
-                    }
-                }
-
-                if ($connector !== null) {
-                    $connector = new GuzzleUri($connector);
-                    $connector = match ($connector->getScheme()) {
-                        'http' => new Http1TunnelConnector($connector->getHost() . ':' . $connector->getPort()),
-                        'https' => new Https1TunnelConnector(
-                            $connector->getHost() . ':' . $connector->getPort(),
-                            new ClientTlsContext($connector->getHost()),
-                        ),
-                        'socks5' => new Socks5TunnelConnector($connector->getHost() . ':' . $connector->getPort())
-                    };
-                }
-            }
-
-            $connectContext = new ConnectContext();
-            if ($tlsContext) {
-                $connectContext = $connectContext->withTlsContext($tlsContext);
-            }
+            $connectContext = (new ConnectContext())->withTlsContext(self::getTlsContext($options));
 
             if (isset($options[RequestOptions::FORCE_IP_RESOLVE])) {
                 $connectContext->withDnsTypeRestriction(match ($options[RequestOptions::FORCE_IP_RESOLVE]) {
@@ -228,15 +157,102 @@ final class GuzzleHandlerAdapter
                 });
             }
 
-            $client = (new HttpClientBuilder())
+            $client = $this->cachedClients[$cacheKey] = (new HttpClientBuilder())
                 ->usingPool(new UnlimitedConnectionPool(new DefaultConnectionFactory(
-                    connector: $connector,
+                    connector: self::getConnector($request, $options),
                     connectContext: $connectContext,
                 )))->build();
-
-            $this->cachedClients[$cacheKey] = $client;
         }
 
         return $client;
+    }
+
+    private static function getPsrAdapter(): PsrAdapter
+    {
+        return self::$psrAdapter ??= new PsrAdapter(
+            new class implements PsrRequestFactory {
+                public function createRequest(string $method, $uri): GuzzleRequest
+                {
+                    return new GuzzleRequest($method, $uri);
+                }
+            },
+            new class implements PsrResponseFactory {
+                public function createResponse(int $code = 200, string $reasonPhrase = ''): GuzzleResponse
+                {
+                    return new GuzzleResponse($code, reason: $reasonPhrase);
+                }
+            },
+        );
+    }
+
+    private static function getConnector(AmpRequest $request, array $options): ?SocketConnector
+    {
+        if (!isset($options[RequestOptions::PROXY])) {
+            return null;
+        }
+
+        $proxy = null;
+
+        if (!\is_array($options[RequestOptions::PROXY])) {
+            $proxy = $options[RequestOptions::PROXY];
+        } else {
+            $scheme = $request->getUri()->getScheme();
+            if (isset($options[RequestOptions::PROXY][$scheme])) {
+                $host = $request->getUri()->getHost();
+                if (!isset($options[RequestOptions::PROXY]['no'])
+                    || !Utils::isHostInNoProxy($host, $options[RequestOptions::PROXY]['no'])
+                ) {
+                    $proxy = $options[RequestOptions::PROXY][$scheme];
+                }
+            }
+        }
+
+        if ($proxy === null) {
+            return null;
+        }
+
+        $uri = new GuzzleUri($proxy);
+
+        return match ($uri->getScheme()) {
+            'http' => new Http1TunnelConnector($uri->getHost() . ':' . $uri->getPort()),
+            'https' => new Https1TunnelConnector(
+                $uri->getHost() . ':' . $uri->getPort(),
+                new ClientTlsContext($uri->getHost()),
+            ),
+            'socks5' => new Socks5TunnelConnector($uri->getHost() . ':' . $uri->getPort()),
+            default => throw new \ValueError('Unsupported protocol in proxy option: ' . $uri->getScheme()),
+        };
+    }
+
+    private static function getTlsContext(array $options): ?ClientTlsContext
+    {
+        $tlsContext = null;
+
+        if (isset($options[RequestOptions::CERT])) {
+            $tlsContext = new ClientTlsContext();
+            if (\is_string($options[RequestOptions::CERT])) {
+                $tlsContext = $tlsContext->withCertificate(new Certificate(
+                    $options[RequestOptions::CERT],
+                    $options[RequestOptions::SSL_KEY] ?? null,
+                ));
+            } else {
+                $tlsContext = $tlsContext->withCertificate(new Certificate(
+                    $options[RequestOptions::CERT][0],
+                    $options[RequestOptions::SSL_KEY] ?? null,
+                    $options[RequestOptions::CERT][1],
+                ));
+            }
+        }
+
+        if (isset($options[RequestOptions::VERIFY])) {
+            $tlsContext ??= new ClientTlsContext();
+            if ($options[RequestOptions::VERIFY] === false) {
+                $tlsContext = $tlsContext->withoutPeerVerification();
+            } elseif (\is_string($options[RequestOptions::VERIFY])) {
+                $tlsContext = $tlsContext->withCaFile($options[RequestOptions::VERIFY]);
+            }
+        }
+
+        return $tlsContext;
     }
 }
