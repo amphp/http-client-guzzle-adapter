@@ -213,14 +213,30 @@ final class GuzzleHandlerAdapter
 
         $uri = new GuzzleUri($proxy);
 
-        return match ($uri->getScheme()) {
-            'http' => new Http1TunnelConnector($uri->getHost() . ':' . $uri->getPort()),
+        $scheme = $uri->getScheme();
+        $userInfo = \urldecode($uri->getUserInfo());
+        if ($scheme === 'socks5') {
+            $user = null;
+            $password = null;
+            if ($userInfo !== '') {
+                [$user, $password] = \explode(':', $userInfo, 2) + [null, null];
+            }
+            return new Socks5TunnelConnector($uri->getHost() . ':' . $uri->getPort(), $user, $password);
+        }
+
+        $headers = [];
+        if ($userInfo !== '') {
+            $headers = ['Proxy-Authorization' => 'Basic '.\base64_encode($userInfo)];
+        }
+
+        return match ($scheme) {
+            'http' => new Http1TunnelConnector($uri->getHost() . ':' . $uri->getPort(), $headers),
             'https' => new Https1TunnelConnector(
                 $uri->getHost() . ':' . $uri->getPort(),
                 new ClientTlsContext($uri->getHost()),
+                $headers
             ),
-            'socks5' => new Socks5TunnelConnector($uri->getHost() . ':' . $uri->getPort()),
-            default => throw new \ValueError('Unsupported protocol in proxy option: ' . $uri->getScheme()),
+            default => throw new \ValueError('Unsupported protocol in proxy option: ' . $scheme),
         };
     }
 
