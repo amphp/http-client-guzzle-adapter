@@ -8,6 +8,7 @@ use Amp\Dns\DnsRecord;
 use Amp\File\File;
 use Amp\Http\Client\Connection\DefaultConnectionFactory;
 use Amp\Http\Client\Connection\UnlimitedConnectionPool;
+use Amp\Http\Client\DelegateHttpClient;
 use Amp\Http\Client\HttpClient;
 use Amp\Http\Client\HttpClientBuilder;
 use Amp\Http\Client\Request as AmpRequest;
@@ -42,18 +43,18 @@ final class GuzzleHandlerAdapter
 {
     private static ?PsrAdapter $psrAdapter = null;
 
-    private readonly HttpClient $client;
+    private readonly DelegateHttpClient $client;
 
     /** @var array<string, HttpClient> */
     private array $cachedClients = [];
 
-    public function __construct(?HttpClient $client = null)
+    public function __construct(?DelegateHttpClient $client = null)
     {
         if (!\interface_exists(PromiseInterface::class)) {
             throw new AssertionError("Please require guzzlehttp/guzzle to use the Guzzle adapter!");
         }
 
-        $this->client = $client ?? (new HttpClientBuilder())->followRedirects(0)->build();
+        $this->client = $client ?? (new GuzzleHttpClientBuilder())->build();
     }
 
     public function __invoke(PsrRequest $request, array $options): PromiseInterface
@@ -70,13 +71,9 @@ final class GuzzleHandlerAdapter
             }
 
             $request = self::getPsrAdapter()->fromPsrRequest($request);
-            if (isset($options[RequestOptions::TIMEOUT])) {
-                $request->setTransferTimeout((float) $options[RequestOptions::TIMEOUT]);
-                $request->setInactivityTimeout((float) $options[RequestOptions::TIMEOUT]);
-            }
-            if (isset($options[RequestOptions::CONNECT_TIMEOUT])) {
-                $request->setTcpConnectTimeout((float) $options[RequestOptions::CONNECT_TIMEOUT]);
-            }
+            $request->setTransferTimeout((float) ($options[RequestOptions::TIMEOUT] ?? 0));
+            $request->setInactivityTimeout((float) ($options[RequestOptions::TIMEOUT] ?? 0));
+            $request->setTcpConnectTimeout((float) ($options[RequestOptions::CONNECT_TIMEOUT] ?? 0));
 
             $client = $this->getClient($request, $options);
 
@@ -118,7 +115,7 @@ final class GuzzleHandlerAdapter
         return $promise;
     }
 
-    private function getClient(AmpRequest $request, array $options): HttpClient
+    private function getClient(AmpRequest $request, array $options): DelegateHttpClient
     {
         $client = $this->client;
 
