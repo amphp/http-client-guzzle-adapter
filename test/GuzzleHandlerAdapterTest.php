@@ -1,6 +1,6 @@
 <?php declare(strict_types=1);
 
-namespace Amp\Http\Client\Psr7;
+namespace Amp\Http\Client\GuzzleAdapter;
 
 use Amp\Http\Client\DelegateHttpClient;
 use Amp\Http\Client\Interceptor\FollowRedirects;

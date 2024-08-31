@@ -1,6 +1,6 @@
 <?php declare(strict_types=1);
 
-use Amp\Http\Client\Psr7\GuzzleHandlerAdapter;
+use Amp\Http\Client\GuzzleAdapter\GuzzleHandlerAdapter;
 use GuzzleHttp\Client;
 use GuzzleHttp\HandlerStack;
 

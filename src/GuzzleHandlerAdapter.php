@@ -1,6 +1,6 @@
 <?php declare(strict_types=1);
 
-namespace Amp\Http\Client\Psr7;
+namespace Amp\Http\Client\GuzzleAdapter;
 
 use Amp\CancelledException;
 use Amp\DeferredCancellation;
@@ -11,6 +11,7 @@ use Amp\Http\Client\Connection\UnlimitedConnectionPool;
 use Amp\Http\Client\DelegateHttpClient;
 use Amp\Http\Client\HttpClient;
 use Amp\Http\Client\HttpClientBuilder;
+use Amp\Http\Client\Psr7\PsrAdapter;
 use Amp\Http\Client\Request as AmpRequest;
 use Amp\Http\Tunnel\Http1TunnelConnector;
 use Amp\Http\Tunnel\Https1TunnelConnector;
