@@ -41,7 +41,8 @@
         "leproxy/leproxy": "^0.2.2",
         "guzzlehttp/guzzle": "^7",
         "phpunit/phpunit": "^9",
-        "psalm/phar": "^5"
+        "psalm/phar": "^5",
+        "revolt/event-loop-adapter-react": "^1.1"
     },
     "autoload": {
         "psr-4": {
