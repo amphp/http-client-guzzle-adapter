@@ -3,16 +3,18 @@
 use Amp\Http\Client\GuzzleAdapter\GuzzleHandlerAdapter;
 use GuzzleHttp\Client;
 use GuzzleHttp\HandlerStack;
-
 use function Amp\async;
-use function Amp\ByteStream\getStdout;
 
 require __DIR__ . '/../vendor/autoload.php';
 
 $client = new Client(['handler' => HandlerStack::create(new GuzzleHandlerAdapter())]);
 
-$future = async($client->get(...), 'https://api.github.com/', ['delay' => 1000]);
+$future = async(fn () => $client->get('https://api.github.com/', ['delay' => 1000]));
 
-getStdout()->write("First output: ".$client->get('https://api.github.com/')->getBody().PHP_EOL);
+$response = $client->get('https://api.github.com/');
 
-getStdout()->write("Deferred output: ".$future->await()->getBody().PHP_EOL);
+echo "First output: " . $response->getBody() . PHP_EOL;
+
+$response = $future->await();
+
+echo "Deferred output: " . $response->getBody() . PHP_EOL;
