@@ -209,6 +209,10 @@ final class GuzzleHandlerAdapter
             return null;
         }
 
+        if (!\class_exists(Https1TunnelConnector::class)) {
+            throw new AssertionError("Please require amphp/http-tunnel to use the proxy option!");
+        }
+
         $uri = new GuzzleUri($proxy);
 
         $scheme = $uri->getScheme();

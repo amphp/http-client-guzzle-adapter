@@ -8,7 +8,9 @@
         "http-client",
         "amphp",
         "async",
-        "psr7"
+        "psr7",
+        "guzzle",
+        "adapter"
     ],
     "license": "MIT",
     "authors": [
@@ -28,18 +30,18 @@
         "amphp/amp": "^3",
         "amphp/http-client": "^5",
         "amphp/http-client-psr7": "^1",
-        "amphp/http-tunnel": "^2",
         "revolt/event-loop": "^1"
     },
     "require-dev": {
-        "amphp/phpunit-util": "^3",
+        "amphp/file": "^3.0",
+        "amphp/http-tunnel": "^2",
         "amphp/php-cs-fixer-config": "^2",
-        "phpunit/phpunit": "^9",
+        "amphp/phpunit-util": "^3",
         "laminas/laminas-diactoros": "^2.3",
-        "guzzlehttp/guzzle": "^7",
-        "psalm/phar": "^5",
         "leproxy/leproxy": "^0.2.2",
-        "amphp/file": "^3.0"
+        "guzzlehttp/guzzle": "^7",
+        "phpunit/phpunit": "^9",
+        "psalm/phar": "^5"
     },
     "autoload": {
         "psr-4": {
