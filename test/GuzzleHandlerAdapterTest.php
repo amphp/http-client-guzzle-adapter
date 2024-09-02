@@ -116,7 +116,7 @@ class GuzzleHandlerAdapterTest extends AsyncTestCase
             function (AmpRequest $request): never {
                 self::assertSame(0., $request->getTransferTimeout());
                 self::assertSame(0., $request->getInactivityTimeout());
-                self::assertSame(0., $request->getTcpConnectTimeout());
+                self::assertSame(60., $request->getTcpConnectTimeout());
 
                 throw new \LogicException('OK');
             },

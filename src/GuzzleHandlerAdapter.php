@@ -74,7 +74,7 @@ final class GuzzleHandlerAdapter
             $request = self::getPsrAdapter()->fromPsrRequest($request);
             $request->setTransferTimeout((float) ($options[RequestOptions::TIMEOUT] ?? 0));
             $request->setInactivityTimeout((float) ($options[RequestOptions::TIMEOUT] ?? 0));
-            $request->setTcpConnectTimeout((float) ($options[RequestOptions::CONNECT_TIMEOUT] ?? 0));
+            $request->setTcpConnectTimeout((float) ($options[RequestOptions::CONNECT_TIMEOUT] ?? 60));
 
             $client = $this->getClient($request, $options);
 
