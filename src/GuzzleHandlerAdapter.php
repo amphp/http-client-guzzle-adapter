@@ -2,17 +2,22 @@
 
 namespace Amp\Http\Client\GuzzleAdapter;
 
+use Amp\ByteStream\StreamException;
+use Amp\Cancellation;
 use Amp\CancelledException;
 use Amp\DeferredCancellation;
 use Amp\Dns\DnsRecord;
 use Amp\File\File;
+use Amp\File\FilesystemException;
 use Amp\Http\Client\Connection\DefaultConnectionFactory;
 use Amp\Http\Client\Connection\UnlimitedConnectionPool;
 use Amp\Http\Client\DelegateHttpClient;
 use Amp\Http\Client\HttpClient;
 use Amp\Http\Client\HttpClientBuilder;
 use Amp\Http\Client\Psr7\PsrAdapter;
+use Amp\Http\Client\Psr7\PsrHttpClientException;
 use Amp\Http\Client\Request as AmpRequest;
+use Amp\Http\Client\Response;
 use Amp\Http\Tunnel\Http1TunnelConnector;
 use Amp\Http\Tunnel\Https1TunnelConnector;
 use Amp\Http\Tunnel\Socks5TunnelConnector;
@@ -32,6 +37,7 @@ use Psr\Http\Message\RequestFactoryInterface as PsrRequestFactory;
 use Psr\Http\Message\RequestInterface as PsrRequest;
 use Psr\Http\Message\ResponseFactoryInterface as PsrResponseFactory;
 use Psr\Http\Message\ResponseInterface as PsrResponse;
+use Psr\Http\Message\StreamInterface as PsrStream;
 use function Amp\async;
 use function Amp\ByteStream\pipe;
 use function Amp\delay;
@@ -49,6 +55,9 @@ final class GuzzleHandlerAdapter
     /** @var array<string, HttpClient> */
     private array $cachedClients = [];
 
+    /** @var \WeakMap<PsrStream, DeferredCancellation> */
+    private \WeakMap $deferredCancellations;
+
     public function __construct(?DelegateHttpClient $client = null)
     {
         if (!\interface_exists(PromiseInterface::class)) {
@@ -56,6 +65,9 @@ final class GuzzleHandlerAdapter
         }
 
         $this->client = $client ?? (new GuzzleHttpClientBuilder())->build();
+
+        /** @var \WeakMap<PsrStream, DeferredCancellation> */
+        $this->deferredCancellations = new \WeakMap();
     }
 
     public function __invoke(PsrRequest $request, array $options): PromiseInterface
@@ -67,8 +79,8 @@ final class GuzzleHandlerAdapter
         $deferredCancellation = new DeferredCancellation();
         $cancellation = $deferredCancellation->getCancellation();
         $future = async(function () use ($request, $options, $cancellation): PsrResponse {
-            if (isset($options['delay'])) {
-                delay($options['delay'] / 1000.0, cancellation: $cancellation);
+            if (isset($options[RequestOptions::DELAY])) {
+                delay($options[RequestOptions::DELAY] / 1000.0, cancellation: $cancellation);
             }
 
             $request = self::getPsrAdapter()->fromPsrRequest($request);
@@ -85,14 +97,13 @@ final class GuzzleHandlerAdapter
             $response = $client->request($request, $cancellation);
 
             if (isset($options[RequestOptions::SINK])) {
-                if (!\is_string($options[RequestOptions::SINK])) {
+                $filename = $options[RequestOptions::SINK];
+                if (!\is_string($filename)) {
                     throw new AssertionError("Only a file name can be provided as sink!");
                 }
-                if (!\interface_exists(File::class)) {
-                    throw new AssertionError("Please require amphp/file to use the sink option!");
-                }
-                $f = openFile($options[RequestOptions::SINK], 'w');
-                pipe($response->getBody(), $f, $cancellation);
+
+                $file = self::pipeResponseToFile($response, $filename, $cancellation);
+                $response->setBody($file);
             }
 
             return self::getPsrAdapter()->toPsrResponse($response);
@@ -101,17 +112,26 @@ final class GuzzleHandlerAdapter
         $future->ignore();
 
         /** @psalm-suppress UndefinedVariable Using $promise reference in definition expression. */
-        $promise = new Promise(static function () use (&$promise, $future, $cancellation): void {
-            try {
-                $promise->resolve($future->await());
-            } catch (CancelledException $e) {
-                if (!$cancellation->isRequested()) {
+        $promise = new Promise(
+            function () use (&$promise, $future, $cancellation, $deferredCancellation): void {
+                try {
+                    /** @var PsrResponse $response */
+                    $response = $future->await();
+
+                    // Prevent destruction of the DeferredCancellation until the response body is destroyed.
+                    $this->deferredCancellations[$response->getBody()] = $deferredCancellation;
+
+                    $promise->resolve($response);
+                } catch (CancelledException $e) {
+                    if (!$cancellation->isRequested()) {
+                        $promise->reject($e);
+                    }
+                } catch (\Throwable $e) {
                     $promise->reject($e);
                 }
-            } catch (\Throwable $e) {
-                $promise->reject($e);
-            }
-        }, $deferredCancellation->cancel(...));
+            },
+            $deferredCancellation->cancel(...),
+        );
 
         return $promise;
     }
@@ -272,5 +292,26 @@ final class GuzzleHandlerAdapter
         }
 
         return $tlsContext;
+    }
+
+    private static function pipeResponseToFile(Response $response, string $filename, Cancellation $cancellation): File
+    {
+        if (!\interface_exists(File::class)) {
+            throw new AssertionError("Please require amphp/file to use the sink option!");
+        }
+
+        try {
+            $file = openFile($filename, 'w');
+            pipe($response->getBody(), $file, $cancellation);
+            $file->seek(0);
+        } catch (FilesystemException|StreamException $exception) {
+            throw new PsrHttpClientException(sprintf(
+                'Failed streaming body to file "%s": %s',
+                $filename,
+                $exception->getMessage(),
+            ), previous: $exception);
+        }
+
+        return $file;
     }
 }
