@@ -82,18 +82,18 @@ final class GuzzleHandlerAdapter
                 delay($options[RequestOptions::DELAY] / 1000.0, cancellation: $cancellation);
             }
 
-            $request = self::getPsrAdapter()->fromPsrRequest($request);
-            $request->setTransferTimeout((float) ($options[RequestOptions::TIMEOUT] ?? 0));
-            $request->setInactivityTimeout((float) ($options[RequestOptions::TIMEOUT] ?? 0));
-            $request->setTcpConnectTimeout((float) ($options[RequestOptions::CONNECT_TIMEOUT] ?? 60));
+            $ampRequest = self::getPsrAdapter()->fromPsrRequest($request);
+            $ampRequest->setTransferTimeout((float) ($options[RequestOptions::TIMEOUT] ?? 0));
+            $ampRequest->setInactivityTimeout((float) ($options[RequestOptions::TIMEOUT] ?? 0));
+            $ampRequest->setTcpConnectTimeout((float) ($options[RequestOptions::CONNECT_TIMEOUT] ?? 60));
 
-            $client = $this->getClient($request, $options);
+            $client = $this->getClient($ampRequest, $options);
 
             if (isset($options['amp']['protocols'])) {
-                $request->setProtocolVersions($options['amp']['protocols']);
+                $ampRequest->setProtocolVersions($options['amp']['protocols']);
             }
 
-            $response = $client->request($request, $cancellation);
+            $response = $client->request($ampRequest, $cancellation);
 
             if (isset($options[RequestOptions::SINK])) {
                 $filename = $options[RequestOptions::SINK];
@@ -101,7 +101,16 @@ final class GuzzleHandlerAdapter
                     throw new AssertionError("Only a file name can be provided as sink!");
                 }
 
-                $file = self::pipeResponseToFile($response, $filename, $cancellation);
+                try {
+                    $file = self::pipeResponseToFile($response, $filename, $cancellation);
+                } catch (FilesystemException|StreamException $exception) {
+                    throw new PsrHttpClientException(\sprintf(
+                        'Failed streaming body to file "%s": %s',
+                        $filename,
+                        $exception->getMessage(),
+                    ), request: $request, previous: $exception);
+                }
+
                 $response->setBody($file);
             }
 
@@ -299,17 +308,9 @@ final class GuzzleHandlerAdapter
             throw new AssertionError("Please require amphp/file to use the sink option!");
         }
 
-        try {
-            $file = openFile($filename, 'w');
-            pipe($response->getBody(), $file, $cancellation);
-            $file->seek(0);
-        } catch (FilesystemException|StreamException $exception) {
-            throw new PsrHttpClientException(\sprintf(
-                'Failed streaming body to file "%s": %s',
-                $filename,
-                $exception->getMessage(),
-            ), previous: $exception);
-        }
+        $file = openFile($filename, 'w');
+        pipe($response->getBody(), $file, $cancellation);
+        $file->seek(0);
 
         return $file;
     }
