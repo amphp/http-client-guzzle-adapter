@@ -15,7 +15,6 @@ use GuzzleHttp\RequestOptions;
 use Laminas\Diactoros\Request;
 use LeProxy\LeProxy\LeProxyServer;
 use React\EventLoop\Loop;
-use Revolt\EventLoop\React\Internal\EventLoopAdapter;
 use function Amp\async;
 use function Amp\delay;
 
