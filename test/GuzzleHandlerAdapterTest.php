@@ -10,9 +10,9 @@ use Amp\PHPUnit\AsyncTestCase;
 use GuzzleHttp\Client;
 use GuzzleHttp\HandlerStack;
 use GuzzleHttp\Promise\PromiseInterface;
+use GuzzleHttp\Psr7\Request;
 use GuzzleHttp\RedirectMiddleware;
 use GuzzleHttp\RequestOptions;
-use Laminas\Diactoros\Request;
 use LeProxy\LeProxy\LeProxyServer;
 use React\EventLoop\Loop;
 use function Amp\async;
@@ -110,7 +110,7 @@ class GuzzleHandlerAdapterTest extends AsyncTestCase
     public function testRequestDefaults(): void
     {
         $promise = (new GuzzleHandlerAdapter($client = $this->createMock(DelegateHttpClient::class)))
-            (new Request(), []);
+            (new Request('GET', 'https://example.com'), []);
 
         $client->method('request')->willReturnCallback(
             function (AmpRequest $request): never {

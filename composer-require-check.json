@@ -14,7 +14,16 @@
         "iterable",
         "callable",
         "void",
-        "object"
+        "object",
+        "createHttpClientBuilder",
+        "Amp\\File\\File",
+        "Amp\\File\\FilesystemException",
+        "Amp\\File\\openFile",
+        "Amp\\Http\\Tunnel\\Http1TunnelConnector",
+        "Amp\\Http\\Tunnel\\Https1TunnelConnector",
+        "Amp\\Http\\Tunnel\\Socks5TunnelConnector",
+        "Psr\\Http\\Message\\RequestFactoryInterface",
+        "Psr\\Http\\Message\\ResponseFactoryInterface"
     ],
     "php-core-extensions": [
         "Core",
@@ -23,6 +32,7 @@
         "Phar",
         "Reflection",
         "SPL",
-        "standard"
+        "standard",
+        "json"
     ]
 }
