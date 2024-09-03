@@ -13,7 +13,6 @@ use Amp\Http\Client\Connection\DefaultConnectionFactory;
 use Amp\Http\Client\Connection\UnlimitedConnectionPool;
 use Amp\Http\Client\DelegateHttpClient;
 use Amp\Http\Client\HttpClient;
-use Amp\Http\Client\HttpClientBuilder;
 use Amp\Http\Client\Psr7\PsrAdapter;
 use Amp\Http\Client\Psr7\PsrHttpClientException;
 use Amp\Http\Client\Request as AmpRequest;
@@ -64,7 +63,7 @@ final class GuzzleHandlerAdapter
             throw new AssertionError("Please require guzzlehttp/guzzle to use the Guzzle adapter!");
         }
 
-        $this->client = $client ?? (new GuzzleHttpClientBuilder())->build();
+        $this->client = $client ?? createHttpClientBuilder()->build();
 
         /** @var \WeakMap<PsrStream, DeferredCancellation> */
         $this->deferredCancellations = new \WeakMap();
@@ -175,7 +174,7 @@ final class GuzzleHandlerAdapter
                 });
             }
 
-            $client = $this->cachedClients[$cacheKey] = (new HttpClientBuilder())
+            $client = $this->cachedClients[$cacheKey] = createHttpClientBuilder()
                 ->usingPool(new UnlimitedConnectionPool(new DefaultConnectionFactory(
                     connector: self::getConnector($request, $options),
                     connectContext: $connectContext,
@@ -305,7 +304,7 @@ final class GuzzleHandlerAdapter
             pipe($response->getBody(), $file, $cancellation);
             $file->seek(0);
         } catch (FilesystemException|StreamException $exception) {
-            throw new PsrHttpClientException(sprintf(
+            throw new PsrHttpClientException(\sprintf(
                 'Failed streaming body to file "%s": %s',
                 $filename,
                 $exception->getMessage(),
