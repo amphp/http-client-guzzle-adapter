@@ -45,10 +45,8 @@
         "amphp/http-tunnel": "^2",
         "amphp/php-cs-fixer-config": "^2",
         "amphp/phpunit-util": "^3",
-        "leproxy/leproxy": "^0.2.2",
         "phpunit/phpunit": "^9",
-        "psalm/phar": "^5",
-        "revolt/event-loop-adapter-react": "^1.1"
+        "psalm/phar": "^5"
     },
     "autoload": {
         "psr-4": {
