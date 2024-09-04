@@ -36,7 +36,7 @@
         "guzzlehttp/guzzle": "^7.9",
         "guzzlehttp/promises": "^2",
         "guzzlehttp/psr7": "^2.7",
-        "psr/http-message": "^1.1",
+        "psr/http-message": "^1.1 || ^2",
         "psr/http-factory-implementation": "^1",
         "revolt/event-loop": "^1"
     },
