@@ -38,11 +38,11 @@
         "guzzlehttp/psr7": "^1 || ^2",
         "psr/http-message": "^1.1 || ^2",
         "psr/http-factory-implementation": "^1",
-        "revolt/event-loop": "^1"
+        "revolt/event-loop": "^1",
+        "amphp/http-tunnel": "^2.0"
     },
     "require-dev": {
         "amphp/file": "^3.0",
-        "amphp/http-tunnel": "^2",
         "amphp/php-cs-fixer-config": "^2",
         "amphp/phpunit-util": "^3",
         "phpunit/phpunit": "^9",

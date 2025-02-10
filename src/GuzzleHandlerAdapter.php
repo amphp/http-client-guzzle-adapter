@@ -24,6 +24,7 @@ use Amp\Socket\Certificate;
 use Amp\Socket\ClientTlsContext;
 use Amp\Socket\ConnectContext;
 use Amp\Socket\SocketConnector;
+use Amp\Socket\Socks5SocketConnector;
 use AssertionError;
 use GuzzleHttp\Promise\Promise;
 use GuzzleHttp\Promise\PromiseInterface;
@@ -251,7 +252,7 @@ final class GuzzleHandlerAdapter
             if ($userInfo !== '') {
                 [$user, $password] = \explode(':', $userInfo, 2) + [null, null];
             }
-            return new Socks5TunnelConnector($uri->getHost() . ':' . $uri->getPort(), $user, $password);
+            return new Socks5SocketConnector($uri->getHost() . ':' . $uri->getPort(), $user, $password);
         }
 
         $headers = [];
