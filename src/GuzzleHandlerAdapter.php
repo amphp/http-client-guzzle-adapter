@@ -19,7 +19,6 @@ use Amp\Http\Client\Request as AmpRequest;
 use Amp\Http\Client\Response;
 use Amp\Http\Tunnel\Http1TunnelConnector;
 use Amp\Http\Tunnel\Https1TunnelConnector;
-use Amp\Http\Tunnel\Socks5TunnelConnector;
 use Amp\Socket\Certificate;
 use Amp\Socket\ClientTlsContext;
 use Amp\Socket\ConnectContext;
