@@ -122,6 +122,10 @@ final class GuzzleHandlerAdapter
         /** @psalm-suppress UndefinedVariable Using $promise reference in definition expression. */
         $promise = new Promise(
             function () use (&$promise, $future, $cancellation, $deferredCancellation): void {
+                if ($deferredCancellation->isCancelled()) {
+                    return;
+                }
+
                 try {
                     /** @var PsrResponse $response */
                     $response = $future->await();
