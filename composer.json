@@ -32,6 +32,7 @@
         "amphp/dns": "^2.2",
         "amphp/http-client": "^5",
         "amphp/http-client-psr7": "^1",
+        "amphp/http-tunnel": "^2.0",
         "amphp/socket": "^2.3",
         "guzzlehttp/guzzle": "^7",
         "guzzlehttp/promises": "^1 || ^2",
@@ -42,7 +43,6 @@
     },
     "require-dev": {
         "amphp/file": "^3.0",
-        "amphp/http-tunnel": "^2",
         "amphp/php-cs-fixer-config": "^2",
         "amphp/phpunit-util": "^3",
         "phpunit/phpunit": "^9",
