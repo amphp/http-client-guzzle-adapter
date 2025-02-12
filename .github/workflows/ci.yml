@@ -18,6 +18,12 @@ jobs:
           - operating-system: 'ubuntu-latest'
             php-version: '8.3'
 
+          - operating-system: 'ubuntu-latest'
+            php-version: '8.4'
+            static-analysis: none
+            style-fix: none
+            composer-require-checker-version: none
+
           - operating-system: 'windows-latest'
             php-version: '8.3'
             job-description: 'on Windows'
@@ -37,7 +43,7 @@ jobs:
           git config --global core.eol lf
 
       - name: Checkout code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
 
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
@@ -75,12 +81,13 @@ jobs:
 
       - name: Run static analysis
         run: vendor/bin/psalm.phar
+        if: matrix.static-analysis != 'none'
 
       - name: Run style fixer
         env:
           PHP_CS_FIXER_IGNORE_ENV: 1
         run: vendor/bin/php-cs-fixer --diff --dry-run -v fix
-        if: runner.os != 'Windows'
+        if: runner.os != 'Windows' && matrix.style-fix != 'none'
 
       - name: Install composer-require-checker
         run: php -r 'file_put_contents("composer-require-checker.phar", file_get_contents("https://github.com/maglnet/ComposerRequireChecker/releases/download/4.2.0/composer-require-checker.phar"));'
