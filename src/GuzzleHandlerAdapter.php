@@ -6,6 +6,7 @@ use Amp\ByteStream\StreamException;
 use Amp\Cancellation;
 use Amp\CancelledException;
 use Amp\DeferredCancellation;
+use Amp\Dns\DnsException;
 use Amp\Dns\DnsRecord;
 use Amp\File\File;
 use Amp\File\FilesystemException;
@@ -17,6 +18,7 @@ use Amp\Http\Client\Psr7\PsrAdapter;
 use Amp\Http\Client\Psr7\PsrHttpClientException;
 use Amp\Http\Client\Request as AmpRequest;
 use Amp\Http\Client\Response;
+use Amp\Http\Client\TimeoutException;
 use Amp\Http\Tunnel\Http1TunnelConnector;
 use Amp\Http\Tunnel\Https1TunnelConnector;
 use Amp\Socket\Certificate;
@@ -25,6 +27,8 @@ use Amp\Socket\ConnectContext;
 use Amp\Socket\SocketConnector;
 use Amp\Socket\Socks5SocketConnector;
 use AssertionError;
+use GuzzleHttp\Exception\ConnectException;
+use GuzzleHttp\Exception\RequestException;
 use GuzzleHttp\Promise\Promise;
 use GuzzleHttp\Promise\PromiseInterface;
 use GuzzleHttp\Psr7\Request as GuzzleRequest;
@@ -121,7 +125,7 @@ final class GuzzleHandlerAdapter
 
         /** @psalm-suppress UndefinedVariable Using $promise reference in definition expression. */
         $promise = new Promise(
-            function () use (&$promise, $future, $cancellation, $deferredCancellation): void {
+            function () use (&$promise, $future, $cancellation, $deferredCancellation, $request): void {
                 if ($deferredCancellation->isCancelled()) {
                     return;
                 }
@@ -139,6 +143,15 @@ final class GuzzleHandlerAdapter
                         $promise->reject($e);
                     }
                 } catch (\Throwable $e) {
+                    if ($e instanceof TimeoutException) {
+                        $e = new ConnectException($e->getMessage(), $request, $e);
+                    } elseif ($e->getPrevious()?->getPrevious() instanceof DnsException) {
+                        // Wrap DNS resolution exception to ConnectException
+                        $e = new ConnectException($e->getPrevious()->getMessage(), $request, $e);
+                    } else {
+                        $e = RequestException::wrapException($request, $e);
+                    }
+
                     $promise->reject($e);
                 }
             },
