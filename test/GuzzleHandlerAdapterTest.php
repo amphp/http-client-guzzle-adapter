@@ -6,12 +6,14 @@ use Amp\Http\Client\DelegateHttpClient;
 use Amp\Http\Client\Interceptor\FollowRedirects;
 use Amp\Http\Client\Interceptor\RetryRequests;
 use Amp\Http\Client\Request as AmpRequest;
+use Amp\Http\Client\Response as AmpResponse;
 use Amp\PHPUnit\AsyncTestCase;
 use GuzzleHttp\Client;
 use GuzzleHttp\HandlerStack;
 use GuzzleHttp\Promise\PromiseInterface;
 use GuzzleHttp\Psr7\Request;
 use GuzzleHttp\RedirectMiddleware;
+use GuzzleHttp\RequestOptions;
 use function Amp\async;
 use function Amp\delay;
 
@@ -83,16 +85,17 @@ class GuzzleHandlerAdapterTest extends AsyncTestCase
 
     /**
      * Tests that when creating a new GuzzleHandlerAdapter, the default application interceptors and their settings
-     * match those of Guzzle 7.
+     * match those of Guzzle 7: like Guzzle's own handlers, the client leaves redirects to Guzzle's RedirectMiddleware.
      */
     public function testApplicationInterceptorDefaults(): void
     {
         $adapter = new GuzzleHandlerAdapter();
         $client = TestTools::readProperty($adapter, 'client');
 
-        $follow = TestTools::findApplicationInterceptor($client, FollowRedirects::class);
-        self::assertInstanceOf(FollowRedirects::class, $follow);
-        self::assertSame(RedirectMiddleware::$defaultSettings['max'], TestTools::readProperty($follow, 'maxRedirects'));
+        self::assertNull(
+            TestTools::findApplicationInterceptor($client, FollowRedirects::class),
+            'Redirect interceptor is not present.',
+        );
 
         foreach (TestTools::walkHttpClientStack($client) as $httpClient) {
             self::assertNull(
@@ -123,5 +126,69 @@ class GuzzleHandlerAdapterTest extends AsyncTestCase
 
         $this->expectExceptionMessageMatches('[^OK$]');
         $promise->wait();
+    }
+
+    /**
+     * Tests that the client built for a request with its own connection options does not follow redirects either.
+     */
+    public function testRequestSpecificClientDoesNotFollowRedirects(): void
+    {
+        $adapter = new GuzzleHandlerAdapter();
+        $getClient = (fn (AmpRequest $request, array $options) => $this->getClient($request, $options))
+            ->bindTo($adapter, GuzzleHandlerAdapter::class);
+
+        $client = $getClient(new AmpRequest('https://example.com/'), [RequestOptions::VERIFY => false]);
+
+        self::assertNotSame(TestTools::readProperty($adapter, 'client'), $client);
+        self::assertNull(
+            TestTools::findApplicationInterceptor($client, FollowRedirects::class),
+            'Redirect interceptor is not present.',
+        );
+    }
+
+    public function testRedirectFollowedByGuzzle(): void
+    {
+        $requestedUris = [];
+        $client = $this->createRedirectingGuzzleClient($requestedUris);
+
+        $response = $client->get('https://example.com/redirect', [
+            RequestOptions::ALLOW_REDIRECTS => ['track_redirects' => true],
+        ]);
+
+        self::assertSame(200, $response->getStatusCode());
+        self::assertSame(['https://example.com/target'], $response->getHeader(RedirectMiddleware::HISTORY_HEADER));
+        self::assertSame(['https://example.com/redirect', 'https://example.com/target'], $requestedUris);
+    }
+
+    public function testRedirectNotFollowedWhenDisallowed(): void
+    {
+        $requestedUris = [];
+        $client = $this->createRedirectingGuzzleClient($requestedUris);
+
+        $response = $client->get('https://example.com/redirect', [RequestOptions::ALLOW_REDIRECTS => false]);
+
+        self::assertSame(302, $response->getStatusCode());
+        self::assertSame(['https://example.com/target'], $response->getHeader('location'));
+        self::assertSame(['https://example.com/redirect'], $requestedUris);
+    }
+
+    /**
+     * @param list<string> $requestedUris
+     */
+    private function createRedirectingGuzzleClient(array &$requestedUris): Client
+    {
+        $httpClient = $this->createMock(DelegateHttpClient::class);
+        $httpClient->method('request')->willReturnCallback(
+            function (AmpRequest $request) use (&$requestedUris): AmpResponse {
+                $uri = (string) $request->getUri();
+                $requestedUris[] = $uri;
+
+                return $uri === 'https://example.com/redirect'
+                    ? new AmpResponse('1.1', 302, 'Found', ['location' => 'https://example.com/target'], '', $request)
+                    : new AmpResponse('1.1', 200, 'OK', [], 'target', $request);
+            },
+        );
+
+        return new Client(['handler' => HandlerStack::create(new GuzzleHandlerAdapter($httpClient))]);
     }
 }
