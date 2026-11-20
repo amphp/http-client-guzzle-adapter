@@ -2,7 +2,10 @@
 
 namespace Amp\Http\Client\GuzzleAdapter;
 
+use Amp\Cancellation;
+use Amp\Dns\DnsException;
 use Amp\Dns\DnsRecord;
+use Amp\Dns\DnsResolver;
 use Amp\Http\Client\DelegateHttpClient;
 use Amp\Http\Client\Interceptor\FollowRedirects;
 use Amp\Http\Client\Interceptor\RetryRequests;
@@ -16,6 +19,8 @@ use GuzzleHttp\RedirectMiddleware;
 use GuzzleHttp\RequestOptions;
 use function Amp\async;
 use function Amp\delay;
+use function Amp\Dns\dnsResolver;
+use function Amp\Socket\listen;
 
 /**
  * @covers \Amp\Http\Client\Psr7\GuzzleHandlerAdapter
@@ -138,20 +143,45 @@ class GuzzleHandlerAdapterTest extends AsyncTestCase
      */
     public function testForceIpResolve(string $forceIpResolve, int $dnsRecordType): void
     {
-        $adapter = new GuzzleHandlerAdapter();
-        $getClient = (fn (AmpRequest $request, array $options) => $this->getClient($request, $options))
-            ->bindTo($adapter, GuzzleHandlerAdapter::class);
+        // Records the requested record type and resolves to the local server below whatever the type.
+        $resolver = new class implements DnsResolver {
+            /** @var list<int|null> */
+            public array $typeRestrictions = [];
 
-        $client = $getClient(
-            new AmpRequest('https://example.com/'),
-            [RequestOptions::FORCE_IP_RESOLVE => $forceIpResolve],
-        );
+            public function resolve(string $name, ?int $typeRestriction = null, ?Cancellation $cancellation = null): array
+            {
+                $this->typeRestrictions[] = $typeRestriction;
+                return [new DnsRecord('127.0.0.1', DnsRecord::A)];
+            }
 
-        $stack = \iterator_to_array(TestTools::walkHttpClientStack($client), false);
-        $pooledClient = \end($stack);
-        $pool = TestTools::readProperty(TestTools::readProperty($pooledClient, 'connectionPool'), 'pool');
-        $connectContext = TestTools::readProperty(TestTools::readProperty($pool, 'connectionFactory'), 'connectContext');
+            public function query(string $name, int $type, ?Cancellation $cancellation = null): array
+            {
+                throw new DnsException('Not implemented');
+            }
+        };
 
-        self::assertSame($dnsRecordType, $connectContext->getDnsTypeRestriction());
+        $server = listen('127.0.0.1:0');
+        $port = $server->getAddress()->getPort();
+        async(function () use ($server): void {
+            $socket = $server->accept();
+            $socket->write("HTTP/1.1 200 OK\r\nContent-Length: 2\r\nConnection: close\r\n\r\nOK");
+            $socket->end();
+        })->ignore();
+
+        $previousResolver = dnsResolver();
+        dnsResolver($resolver);
+
+        try {
+            $client = new Client(['handler' => HandlerStack::create(new GuzzleHandlerAdapter())]);
+            $response = $client->get("http://force-ip-resolve.test:$port/", [
+                RequestOptions::FORCE_IP_RESOLVE => $forceIpResolve,
+            ]);
+        } finally {
+            dnsResolver($previousResolver);
+            $server->close();
+        }
+
+        self::assertSame('OK', (string) $response->getBody());
+        self::assertSame([$dnsRecordType], $resolver->typeRestrictions);
     }
 }
