@@ -2,6 +2,7 @@
 
 namespace Amp\Http\Client\GuzzleAdapter;
 
+use Amp\Dns\DnsRecord;
 use Amp\Http\Client\DelegateHttpClient;
 use Amp\Http\Client\Interceptor\FollowRedirects;
 use Amp\Http\Client\Interceptor\RetryRequests;
@@ -12,6 +13,7 @@ use GuzzleHttp\HandlerStack;
 use GuzzleHttp\Promise\PromiseInterface;
 use GuzzleHttp\Psr7\Request;
 use GuzzleHttp\RedirectMiddleware;
+use GuzzleHttp\RequestOptions;
 use function Amp\async;
 use function Amp\delay;
 
@@ -123,5 +125,33 @@ class GuzzleHandlerAdapterTest extends AsyncTestCase
 
         $this->expectExceptionMessageMatches('[^OK$]');
         $promise->wait();
+    }
+
+    public function provideForceIpResolve(): iterable
+    {
+        yield 'v4' => ['v4', DnsRecord::A];
+        yield 'v6' => ['v6', DnsRecord::AAAA];
+    }
+
+    /**
+     * @dataProvider provideForceIpResolve
+     */
+    public function testForceIpResolve(string $forceIpResolve, int $dnsRecordType): void
+    {
+        $adapter = new GuzzleHandlerAdapter();
+        $getClient = (fn (AmpRequest $request, array $options) => $this->getClient($request, $options))
+            ->bindTo($adapter, GuzzleHandlerAdapter::class);
+
+        $client = $getClient(
+            new AmpRequest('https://example.com/'),
+            [RequestOptions::FORCE_IP_RESOLVE => $forceIpResolve],
+        );
+
+        $stack = \iterator_to_array(TestTools::walkHttpClientStack($client), false);
+        $pooledClient = \end($stack);
+        $pool = TestTools::readProperty(TestTools::readProperty($pooledClient, 'connectionPool'), 'pool');
+        $connectContext = TestTools::readProperty(TestTools::readProperty($pool, 'connectionFactory'), 'connectContext');
+
+        self::assertSame($dnsRecordType, $connectContext->getDnsTypeRestriction());
     }
 }
