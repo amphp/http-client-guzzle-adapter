@@ -85,7 +85,7 @@ class GuzzleHandlerAdapterTest extends AsyncTestCase
 
     /**
      * Tests that when creating a new GuzzleHandlerAdapter, the default application interceptors and their settings
-     * match those of Guzzle 7: like Guzzle's own handlers, the client leaves redirects to Guzzle's RedirectMiddleware.
+     * match those of Guzzle 7.
      */
     public function testApplicationInterceptorDefaults(): void
     {

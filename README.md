@@ -34,7 +34,7 @@ $client = new Client([
 ]);
 ```
 
-Like Guzzle's own handlers, the adapter does not follow redirects. Guzzle's `RedirectMiddleware`, which `HandlerStack::create()` adds, follows them as set by the `allow_redirects` request option. If you pass your own `HttpClient` to `GuzzleHandlerAdapter`, build it with `followRedirects(0)`, as `createHttpClientBuilder()` does.
+Note that Guzzle's `HandlerStack::create()` adds a `RedirectMiddleware` which follows redirects as set by the `allow_redirects` request option. If you pass your own `HttpClient` to `GuzzleHandlerAdapter`, we recommend using the `HttpClientBuilder` returned by `Amp\Http\Client\GuzzleAdapter\createHttpClientBuilder()` to build the `HttpClient`.
 
 ## Examples
 
