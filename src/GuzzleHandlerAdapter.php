@@ -13,10 +13,12 @@ use Amp\Http\Client\Connection\DefaultConnectionFactory;
 use Amp\Http\Client\Connection\UnlimitedConnectionPool;
 use Amp\Http\Client\DelegateHttpClient;
 use Amp\Http\Client\HttpClient;
+use Amp\Http\Client\HttpException;
 use Amp\Http\Client\Psr7\PsrAdapter;
-use Amp\Http\Client\Psr7\PsrHttpClientException;
 use Amp\Http\Client\Request as AmpRequest;
 use Amp\Http\Client\Response;
+use Amp\Http\Client\SocketException;
+use Amp\Http\Client\TimeoutException;
 use Amp\Http\Tunnel\Http1TunnelConnector;
 use Amp\Http\Tunnel\Https1TunnelConnector;
 use Amp\Socket\Certificate;
@@ -25,6 +27,9 @@ use Amp\Socket\ConnectContext;
 use Amp\Socket\SocketConnector;
 use Amp\Socket\Socks5SocketConnector;
 use AssertionError;
+use GuzzleHttp\Exception\ConnectException;
+use GuzzleHttp\Exception\RequestException;
+use GuzzleHttp\Promise\CancellationException;
 use GuzzleHttp\Promise\Promise;
 use GuzzleHttp\Promise\PromiseInterface;
 use GuzzleHttp\Psr7\Request as GuzzleRequest;
@@ -104,11 +109,16 @@ final class GuzzleHandlerAdapter
                 try {
                     $file = self::pipeResponseToFile($response, $filename, $cancellation);
                 } catch (FilesystemException|StreamException $exception) {
-                    throw new PsrHttpClientException(\sprintf(
-                        'Failed streaming body to file "%s": %s',
-                        $filename,
-                        $exception->getMessage(),
-                    ), request: $request, previous: $exception);
+                    throw new RequestException(
+                        \sprintf(
+                            'Failed streaming body to file "%s": %s',
+                            $filename,
+                            $exception->getMessage(),
+                        ),
+                        request: $request,
+                        response: self::getPsrAdapter()->toPsrResponse($response),
+                        previous: $exception,
+                    );
                 }
 
                 $response->setBody($file);
@@ -121,7 +131,7 @@ final class GuzzleHandlerAdapter
 
         /** @psalm-suppress UndefinedVariable Using $promise reference in definition expression. */
         $promise = new Promise(
-            function () use (&$promise, $future, $cancellation, $deferredCancellation): void {
+            function () use (&$promise, $future, $cancellation, $deferredCancellation, $request): void {
                 if ($deferredCancellation->isCancelled()) {
                     return;
                 }
@@ -136,8 +146,12 @@ final class GuzzleHandlerAdapter
                     $promise->resolve($response);
                 } catch (CancelledException $e) {
                     if (!$cancellation->isRequested()) {
-                        $promise->reject($e);
+                        $promise->reject(new CancellationException('Request has been cancelled', $e->getMessage()));
                     }
+                } catch (SocketException|TimeoutException $e) {
+                    $promise->reject(new ConnectException($e->getMessage(), $request, $e));
+                } catch (HttpException $e) {
+                    $promise->reject(new RequestException($e->getMessage(), $request, previous: $e));
                 } catch (\Throwable $e) {
                     $promise->reject($e);
                 }
