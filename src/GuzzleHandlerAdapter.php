@@ -176,7 +176,7 @@ final class GuzzleHandlerAdapter
             $connectContext = (new ConnectContext())->withTlsContext(self::getTlsContext($options));
 
             if (isset($options[RequestOptions::FORCE_IP_RESOLVE])) {
-                $connectContext->withDnsTypeRestriction(match ($options[RequestOptions::FORCE_IP_RESOLVE]) {
+                $connectContext = $connectContext->withDnsTypeRestriction(match ($options[RequestOptions::FORCE_IP_RESOLVE]) {
                     'v4' => DnsRecord::A,
                     'v6' => DnsRecord::AAAA,
                     default => throw new \ValueError(\sprintf(
